@@ -43,6 +43,8 @@ pub struct TaskManager {
 pub struct TaskManagerInner {
     /// task list
     tasks: [TaskControlBlock; MAX_APP_NUM],
+    /// syscall times
+    syscall_times: [[usize; 512]; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
 }
@@ -64,6 +66,7 @@ lazy_static! {
             inner: unsafe {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
+                    syscall_times: [[0; 512]; MAX_APP_NUM],
                     current_task: 0,
                 })
             },
@@ -135,6 +138,22 @@ impl TaskManager {
             panic!("All applications completed!");
         }
     }
+
+    /// Record the syscall times for each task
+    fn record_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.syscall_times[current][syscall_id] += 1;
+        drop(inner);
+    }
+
+    fn report_syscall(&self, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let result = inner.syscall_times[current][syscall_id];
+        drop(inner);
+        result
+    }
 }
 
 /// Run the first task in task list.
@@ -168,4 +187,15 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Record the syscall times for each task
+pub fn record_syscall_times(syscall_id: usize) {
+    trace!("Recording syscall id: {}", syscall_id);
+    TASK_MANAGER.record_syscall(syscall_id);
+}
+
+/// Report the syscall times for each task
+pub fn report_syscall_times(syscall_id: usize) -> usize {
+    TASK_MANAGER.report_syscall(syscall_id)
 }
