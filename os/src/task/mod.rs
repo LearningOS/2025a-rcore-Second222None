@@ -41,12 +41,14 @@ pub struct TaskManager {
 
 /// Inner of Task Manager
 pub struct TaskManagerInner {
+    ///// syscall times
+    //syscall_times: [[usize; 512]; MAX_APP_NUM],
     /// task list
     tasks: [TaskControlBlock; MAX_APP_NUM],
-    /// syscall times
-    syscall_times: [[usize; 512]; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+    /// syscall times
+    syscall_times: [[usize; 512]; MAX_APP_NUM],
 }
 
 lazy_static! {
@@ -66,8 +68,8 @@ lazy_static! {
             inner: unsafe {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
-                    syscall_times: [[0; 512]; MAX_APP_NUM],
                     current_task: 0,
+                    syscall_times: [[0; 512]; MAX_APP_NUM],
                 })
             },
         }
