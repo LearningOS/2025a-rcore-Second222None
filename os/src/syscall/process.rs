@@ -1,5 +1,5 @@
 //! Process management syscalls
-use crate::task::{change_program_brk, current_user_token, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::task::{change_program_brk, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, TASK_MANAGER};
 
 use crate::mm::translated_byte_buffer;
 use crate::timer::get_time_us;
@@ -32,11 +32,11 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
 
     let length = core::mem::size_of::<TimeVal>();
-    let mut timeval_ptr = translated_byte_buffer(current_user_token(), ts as *const u8, length);
+    let mut timeval_buf = translated_byte_buffer(current_user_token(), ts as *const u8, length);
 
     let us = get_time_us();
 
-    let timeval = unsafe { &mut *(timeval_ptr[0].as_mut_ptr() as *mut TimeVal) };
+    let timeval = unsafe { &mut *(timeval_buf[0].as_mut_ptr() as *mut TimeVal) };
     timeval.sec = us / 1_000_000;
     timeval.usec = us % 1_000_000;
 
@@ -45,9 +45,30 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// TODO: Finish sys_trace to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
-pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
+pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+    TASK_MANAGER.set_nr_syscall(id);
+    match trace_request {
+        0 => {
+            // enable tracing for syscall with _id
+            // YOUR JOB
+            let kernel_id = translated_byte_buffer(current_user_token(), id as *const u8, 1);
+            (unsafe { *(kernel_id[0].as_ptr()) }).into()
+        },
+        1 => {
+            // disable tracing for syscall with _id
+            // YOUR JOB
+            let mut kernel_id = translated_byte_buffer(current_user_token(), id as *mut u8, 1);
+            (unsafe { *(kernel_id[0].as_mut_ptr()) = data as u8 });
+            0
+        },
+        2 => {
+            // get the number of times syscall with _id has been called
+            // YOUR JOB
+            TASK_MANAGER.get_nr_syscall(id) as isize
+        },
+        _ => -1,
+    }
 }
 
 // YOUR JOB: Implement mmap.

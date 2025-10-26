@@ -71,6 +71,26 @@ lazy_static! {
 }
 
 impl TaskManager {
+    /// Get the number of a syscall by its id
+    pub fn get_nr_syscall(&self, syscall_id: usize) -> usize {
+        let inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        let nr_syscalls = inner.tasks[current_task].nr_syscalls[syscall_id];
+        drop(inner);
+        nr_syscalls
+    }
+    /// Record a syscall by its id
+    pub fn set_nr_syscall(&self, syscall_id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task;
+        if syscall_id >= inner.tasks[current_task].nr_syscalls.len() {
+            drop(inner);
+            return;
+        } else {
+            inner.tasks[current_task].nr_syscalls[syscall_id] += 1;
+        }
+        drop(inner);
+    }
     /// Run the first task in task list.
     ///
     /// Generally, the first task in task list is an idle task (we call it zero process later).
