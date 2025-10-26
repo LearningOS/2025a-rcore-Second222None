@@ -7,6 +7,8 @@ use crate::{
     },
 };
 use alloc::{string::String, sync::Arc, vec::Vec};
+use crate::mm::translated_byte_buffer;
+use crate::timer::get_time_us;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -151,12 +153,22 @@ pub fn sys_kill(pid: usize, signal: u32) -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_get_time NOT IMPLEMENTED",
         current_task().unwrap().process.upgrade().unwrap().getpid()
     );
-    -1
+
+    let length = core::mem::size_of::<TimeVal>();
+    let mut timeval_ptr = translated_byte_buffer(current_user_token(), ts as *const u8, length);
+
+    let us = get_time_us();
+
+    let timeval = unsafe { &mut *(timeval_ptr[0].as_mut_ptr() as *mut TimeVal) };
+    timeval.sec = us / 1_000_000;
+    timeval.usec = us % 1_000_000;
+
+    0
 }
 
 /// mmap syscall
