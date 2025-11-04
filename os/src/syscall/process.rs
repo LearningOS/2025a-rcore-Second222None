@@ -48,7 +48,6 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
-    TASK_MANAGER.set_nr_syscall(id);
     match trace_request {
         0 => {
             // read
