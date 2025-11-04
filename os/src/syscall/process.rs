@@ -52,21 +52,21 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
         0 => {
             // read
             // check id
-            println!("kernel: sys_trace read id = {:#x}", id);
+            //println!("kernel: sys_trace read id = {:#x}", id);
             let token = current_user_token();
             let page_table = crate::mm::PageTable::from_token(token);
             let pe = page_table.translate(VirtAddr::from(id).floor());
-            println!("kernel: sys_trace read id = {:#x}", id);
+            //println!("kernel: sys_trace read id = {:#x}", id);
             match pe {
                 Some(pte) => {
-                    println!("kernel: sys_trace pte = {:?}", pte.flags());
+                    //println!("kernel: sys_trace pte = {:?}", pte.flags());
                     if pte.flags().contains(PTEFlags::U) {
-                        println!("kernel: PTEFlags::U");
+                        //println!("kernel: PTEFlags::U");
                         let kernel_id = translated_byte_buffer(current_user_token(), id as *const u8, 1);
-                        println!("kernel: sys_trace read id = {:#x}", id);
+                        //println!("kernel: sys_trace read id = {:#x}", id);
                         (unsafe { *(kernel_id[0].as_ptr()) }).into()
                     } else {
-                        println!("kernel: NO PTEFlags::U");
+                        //println!("kernel: NO PTEFlags::U");
                         return -1;
                     }
                 },
