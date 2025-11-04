@@ -238,3 +238,13 @@ pub fn current_trap_cx() -> &'static mut TrapContext {
 pub fn change_program_brk(size: i32) -> Option<usize> {
     TASK_MANAGER.change_current_program_brk(size)
 }
+
+/// Get the number of a syscall by its id
+pub fn get_nr_syscall(syscall_id: usize) -> usize {
+    TASK_MANAGER.get_nr_syscall(syscall_id)
+}
+
+/// Set the number of a syscall by its id
+pub fn set_nr_syscall(syscall_id: usize) {
+    TASK_MANAGER.set_nr_syscall(syscall_id);
+}

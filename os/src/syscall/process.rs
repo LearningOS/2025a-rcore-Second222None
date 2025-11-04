@@ -2,7 +2,7 @@
 use crate::config::PAGE_SIZE;
 use crate::task::{change_program_brk, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, TASK_MANAGER};
 
-use crate::mm::{MapPermission, VirtAddr, translated_byte_buffer};
+use crate::mm::{MapPermission, PTEFlags, VirtAddr, translated_byte_buffer};
 use crate::timer::get_time_us;
 
 #[repr(C)]
@@ -51,15 +51,59 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     TASK_MANAGER.set_nr_syscall(id);
     match trace_request {
         0 => {
-            // enable tracing for syscall with _id
-            let kernel_id = translated_byte_buffer(current_user_token(), id as *const u8, 1);
-            (unsafe { *(kernel_id[0].as_ptr()) }).into()
+            // read
+            // check id
+            println!("kernel: sys_trace read id = {:#x}", id);
+            let token = current_user_token();
+            let page_table = crate::mm::PageTable::from_token(token);
+            let pe = page_table.translate(VirtAddr::from(id).floor());
+            println!("kernel: sys_trace read id = {:#x}", id);
+            match pe {
+                Some(pte) => {
+                    println!("kernel: sys_trace pte = {:?}", pte.flags());
+                    if pte.flags().contains(PTEFlags::U) {
+                        println!("kernel: PTEFlags::U");
+                        let kernel_id = translated_byte_buffer(current_user_token(), id as *const u8, 1);
+                        println!("kernel: sys_trace read id = {:#x}", id);
+                        (unsafe { *(kernel_id[0].as_ptr()) }).into()
+                    } else {
+                        println!("kernel: NO PTEFlags::U");
+                        return -1;
+                    }
+                },
+                None => {
+                    //println!("kernel: sys_trace read id = {:#x}", id);
+                    return -1
+                },
+            }
         },
         1 => {
-            // disable tracing for syscall with _id
-            let mut kernel_id = translated_byte_buffer(current_user_token(), id as *mut u8, 1);
-            (unsafe { *(kernel_id[0].as_mut_ptr()) = data as u8 });
-            0
+            // write
+            //println!("kernel: sys_trace read id = {:#x}", id);
+            let token = current_user_token();
+            let page_table = crate::mm::PageTable::from_token(token);
+            let pe = page_table.translate(VirtAddr::from(id).floor());
+            //println!("kernel: sys_trace read id = {:#x}", id);
+            match pe {
+                Some(pte) => {
+                    //println!("kernel: sys_trace pte = {:?}", pte.flags());
+                    if !pte.flags().contains(PTEFlags::U) || !pte.flags().contains(PTEFlags::W) {
+                        //println!("kernel: NO PTEFlags::U or PTEFlags::W");
+                        -1
+                    } else {
+                        //println!("kernel: PTEFlags::U and PTEFlags::W");
+                        let mut kernel_id = translated_byte_buffer(current_user_token(), id as *mut u8, 1);
+                        (unsafe { *(kernel_id[0].as_mut_ptr()) = data as u8 });
+                        0 
+                    }
+                },
+                None => {
+                    -1
+                },
+            }
+            // let mut kernel_id = translated_byte_buffer(current_user_token(), id as *mut u8, 1);
+            // (unsafe { *(kernel_id[0].as_mut_ptr()) = data as u8 });
+            // 0
         },
         2 => {
             // get the number of times syscall with _id has been called
