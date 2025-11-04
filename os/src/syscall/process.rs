@@ -52,20 +52,17 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     match trace_request {
         0 => {
             // enable tracing for syscall with _id
-            // YOUR JOB
             let kernel_id = translated_byte_buffer(current_user_token(), id as *const u8, 1);
             (unsafe { *(kernel_id[0].as_ptr()) }).into()
         },
         1 => {
             // disable tracing for syscall with _id
-            // YOUR JOB
             let mut kernel_id = translated_byte_buffer(current_user_token(), id as *mut u8, 1);
             (unsafe { *(kernel_id[0].as_mut_ptr()) = data as u8 });
             0
         },
         2 => {
             // get the number of times syscall with _id has been called
-            // YOUR JOB
             TASK_MANAGER.get_nr_syscall(id) as isize
         },
         _ => -1,
