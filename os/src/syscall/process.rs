@@ -1,7 +1,8 @@
 //! Process management syscalls
+use crate::config::PAGE_SIZE;
 use crate::task::{change_program_brk, current_user_token, exit_current_and_run_next, suspend_current_and_run_next, TASK_MANAGER};
 
-use crate::mm::translated_byte_buffer;
+use crate::mm::{MapPermission, PTEFlags, PageTable, VirtAddr, frame_alloc, translated_byte_buffer};
 use crate::timer::get_time_us;
 
 #[repr(C)]
@@ -72,9 +73,80 @@ pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
 }
 
 // YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    // check start alignment
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+
+    // prot validity: only low 3 bits allowed and must not be zero
+    if prot & !0x7 != 0 || prot & 0x7 == 0 {
+        return -1;
+    }
+
+    // nothing to do
+    if len == 0 {
+        return 0;
+    }
+
+    // number of pages to map (round up)
+    let npages = (len + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    let token = current_user_token();
+
+    // --- Phase 1: detect overlap with already mapped pages ---
+    // The exact method to test whether a VA is already mapped depends on your page-table API.
+    // Here we assume `token.translate_va(va)` -> Option<phys_addr> or similar.
+    // for i in 0..npages {
+    //     let va = start + i * PAGE_SIZE;
+    //     // Adapt this check to your page-table API:
+    //     // if token.translate_va(va).is_some() { return -1; }
+    //     //
+    //     // Fallback generic attempt using translated_byte_buffer: if a single-byte translation succeeds,
+    //     // treat the page as mapped.
+    //     let probe = translated_byte_buffer(token, va as *const u8, 1);
+    //     // If translated_byte_buffer returns a non-empty mapping, the page is already mapped.
+    //     // Note: translated_byte_buffer returns one or more kernel-side slices covering the user buffer.
+    //     if !probe.is_empty() {
+    //         // The page is already mapped -> error
+    //         return -1;
+    //     }
+    // }
+
+    // --- Phase 2: allocate physical frames and map them ---
+    // The following uses typical rCore-like helpers. Replace with your project's frame allocator
+    // and page-table map call if names differ.
+    for i in 0..npages {
+        let va = start + i * PAGE_SIZE;
+
+        // allocate one physical frame/page
+        // expected API: crate::mm::frame_alloc() -> Option<FrameTracker>
+        let frame = match frame_alloc() {
+            Some(f) => f,
+            None => return -1, // physical memory exhausted
+        };
+
+        // build permissions from prot bits: bit0 read, bit1 write, bit2 exec
+        let mut perm = crate::mm::MapPermission::empty();
+        if prot & 0x1 != 0 { perm |= MapPermission::R; }
+        if prot & 0x2 != 0 { perm |= MapPermission::W; }
+        if prot & 0x4 != 0 { perm |= MapPermission::X; }
+        // user bit usually needed for user mappings
+        perm |= crate::mm::MapPermission::U;
+
+        // map the frame to VA.
+        // let token = current_user_token();
+        let mut page_table = PageTable::from_token(token);
+        let pte_flags = PTEFlags::from_bits(perm.bits()).unwrap();
+
+        page_table.map(
+            VirtAddr::from(va).into(),
+            frame.ppn,
+            pte_flags,
+        );
+    }
+    0
 }
 
 // YOUR JOB: Implement munmap.
