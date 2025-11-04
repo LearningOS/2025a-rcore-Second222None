@@ -15,6 +15,7 @@ mod switch;
 mod task;
 
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, VirtAddr};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -89,6 +90,13 @@ impl TaskManager {
         } else {
             inner.tasks[current_task].nr_syscalls[syscall_id] += 1;
         }
+        drop(inner);
+    }
+    /// Add mmap area
+    pub fn add_mmap_area(&self, start_va: VirtAddr, end_va: VirtAddr, perm: MapPermission) {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task; 
+        inner.tasks[current_task].add_mmap_area(start_va, end_va, perm);
         drop(inner);
     }
     /// Run the first task in task list.

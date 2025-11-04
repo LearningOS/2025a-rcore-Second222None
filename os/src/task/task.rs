@@ -34,6 +34,10 @@ pub struct TaskControlBlock {
 }
 
 impl TaskControlBlock {
+    /// add mmap area
+    pub fn add_mmap_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, perm: MapPermission) {
+        self.memory_set.insert_framed_area(start_va.into(), end_va.into(), perm);
+    }
     /// get the trap context
     pub fn get_trap_cx(&self) -> &'static mut TrapContext {
         self.trap_cx_ppn.get_mut()
