@@ -34,6 +34,10 @@ pub struct TaskControlBlock {
 }
 
 impl TaskControlBlock {
+    /// check whether there is overlap with already mapped pages
+    pub fn check_mmap_area(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        self.memory_set.check_mmap_area(start_va.into(), end_va.into())
+    }
     /// add mmap area
     pub fn add_mmap_area(&mut self, start_va: VirtAddr, end_va: VirtAddr, perm: MapPermission) {
         self.memory_set.insert_framed_area(start_va.into(), end_va.into(), perm);

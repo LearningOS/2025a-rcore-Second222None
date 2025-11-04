@@ -92,6 +92,14 @@ impl TaskManager {
         }
         drop(inner);
     }
+    /// Check whether there is overlap with already mapped pages
+    pub fn check_mmap_area(&self, start_va: VirtAddr, end_va: VirtAddr) -> bool {
+        let inner = self.inner.exclusive_access();
+        let current_task = inner.current_task; 
+        let res = inner.tasks[current_task].check_mmap_area(start_va, end_va);
+        drop(inner);
+        res
+    }
     /// Add mmap area
     pub fn add_mmap_area(&self, start_va: VirtAddr, end_va: VirtAddr, perm: MapPermission) {
         let mut inner = self.inner.exclusive_access();

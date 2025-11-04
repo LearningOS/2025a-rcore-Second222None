@@ -94,10 +94,16 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
     if len == 0 {
         return 0;
     }
+    // round up
+    let length = (len + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
 
     // --- Phase 1: detect overlap with already mapped pages ---
+    let overlap = TASK_MANAGER.check_mmap_area(start.into(), (start + length).into());
+    if overlap {
+        return -1;
+    }
 
-
+    // --- Phase 2: allocate physical frames and map them ---
     TASK_MANAGER.add_mmap_area(
         VirtAddr::from(start),
         VirtAddr::from(start + len),
@@ -107,10 +113,7 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
     // number of pages to map (round up)
     // let npages = (len + PAGE_SIZE - 1) / PAGE_SIZE;
     // let token = current_user_token();
-
-    // --- Phase 2: allocate physical frames and map them ---
-    // The following uses typical rCore-like helpers. Replace with your project's frame allocator
-    // and page-table map call if names differ.
+    
     // for i in 0..npages {
     //     let va = start + i * PAGE_SIZE;
 
