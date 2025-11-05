@@ -190,9 +190,14 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
 }
 
 // YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    //trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    let start_va = VirtAddr::from(start);
+    let end_va = VirtAddr::from(start + len);
+    TASK_MANAGER.remove_mmap_area(start_va, end_va)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

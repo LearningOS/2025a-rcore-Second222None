@@ -62,6 +62,27 @@ impl MemorySet {
         }
         false
     }
+    /// Remove 
+    pub fn remove_framed_area(
+        &mut self,
+        start_va: VirtAddr,
+        end_va:VirtAddr,
+    ) -> isize {
+        if let Some(pos) = self
+            .areas
+            .iter()
+            .position(|area| {
+            area.vpn_range.get_start() == start_va.floor()
+                && area.vpn_range.get_end() == end_va.ceil()
+            })
+        {
+            let mut area = self.areas.remove(pos);
+            area.unmap(&mut self.page_table);
+            0
+        } else {
+            -1
+        }
+    }
     /// Assume that no conflicts.
     pub fn insert_framed_area(
         &mut self,

@@ -107,6 +107,14 @@ impl TaskManager {
         inner.tasks[current_task].add_mmap_area(start_va, end_va, perm);
         drop(inner);
     }
+    /// unmap area
+    pub fn remove_mmap_area(&self, start_va: VirtAddr, end_va: VirtAddr) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current_task = inner.current_task; 
+        let res = inner.tasks[current_task].remove_mmap_area(start_va, end_va);
+        drop(inner); 
+        res
+    }
     /// Run the first task in task list.
     ///
     /// Generally, the first task in task list is an idle task (we call it zero process later).
