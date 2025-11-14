@@ -1,7 +1,7 @@
 //! Process management syscalls
 use alloc::sync::Arc;
 
-use crate::mm::translated_byte_buffer;
+use crate::mm::{translated_byte_buffer, VirtAddr};
 use crate::timer::get_time_us;
 use crate::{
     config::PAGE_SIZE,
@@ -132,10 +132,7 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// YOUR JOB: Implement mmap.
 pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
+    trace!("kernel:pid[{}] sys_mmap", current_task().unwrap().pid.0);
     let mut perm = MapPermission::empty();
     // Check start address alignment
     if start % PAGE_SIZE != 0 {
@@ -180,12 +177,30 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
 }
 
 /// YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    trace!("kernel:pid[{}] sys_munmap", current_task().unwrap().pid.0);
+
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+
+    if len % PAGE_SIZE != 0 {
+        return -1;
+    }
+
+    let start_va = VirtAddr::from(start);
+    // let end_va = VirtAddr::from(start + len);
+    let start_vpn = start_va.floor();
+    // let end_vpn = end_va.ceil();
+
+    match current_task() {
+        Some(task) => {
+            let mut inner = task.inner_exclusive_access();
+            inner.memory_set.remove_area_with_start_vpn(start_vpn);
+            0
+        }
+        None => -1,
+    }
 }
 
 /// change data segment size
