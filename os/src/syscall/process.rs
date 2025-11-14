@@ -1,16 +1,17 @@
 //! Process management syscalls
 use alloc::sync::Arc;
 
-use crate::{
-    loader::get_app_data_by_name,
-    mm::{translated_refmut, translated_str},
-    task::{
-        add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next,
-    },
-};
 use crate::mm::translated_byte_buffer;
 use crate::timer::get_time_us;
+use crate::{
+    config::PAGE_SIZE,
+    loader::get_app_data_by_name,
+    mm::{translated_refmut, translated_str, MapPermission},
+    task::{
+        add_mmap_area, add_task, check_mmap_area, current_task, current_user_token,
+        exit_current_and_run_next, suspend_current_and_run_next,
+    },
+};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -69,7 +70,11 @@ pub fn sys_exec(path: *const u8) -> isize {
 /// If there is not a child process whose pid is same as given, return -1.
 /// Else if there is a child process but it is still running, return -2.
 pub fn sys_waitpid(pid: isize, exit_code_ptr: *mut i32) -> isize {
-    trace!("kernel::pid[{}] sys_waitpid [{}]", current_task().unwrap().pid.0, pid);
+    trace!(
+        "kernel::pid[{}] sys_waitpid [{}]",
+        current_task().unwrap().pid.0,
+        pid
+    );
     let task = current_task().unwrap();
     // find a child process
 
@@ -126,12 +131,52 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 }
 
 /// YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
     trace!(
         "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
         current_task().unwrap().pid.0
     );
-    -1
+    let mut perm = MapPermission::empty();
+    // Check start address alignment
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+
+    if len == 0 {
+        return 0;
+    }
+
+    // prot validity: only low 3 bits allowed and must not be zero
+    if prot & !0x7 != 0 || prot & 0x7 == 0 {
+        return -1;
+    } else {
+        // build permissions from prot bits: bit0 read, bit1 write, bit2 exec
+        if prot & 0x1 != 0 {
+            perm |= MapPermission::R;
+        }
+        if prot & 0x2 != 0 {
+            perm |= MapPermission::W;
+        }
+        if prot & 0x4 != 0 {
+            perm |= MapPermission::X;
+        }
+        // user bit usually needed for user mappings
+        perm |= MapPermission::U;
+    }
+
+    // round up
+    let length = (len + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+
+    // --- Phase 1: detect overlap with already mapped pages ---
+    let overlap = check_mmap_area(start.into(), (start + length).into());
+    if overlap {
+        return -1;
+    }
+
+    // --- Phase 2: allocate physical frames and map them ---
+    add_mmap_area(start.into(), (start + len).into(), perm);
+
+    0
 }
 
 /// YOUR JOB: Implement munmap.

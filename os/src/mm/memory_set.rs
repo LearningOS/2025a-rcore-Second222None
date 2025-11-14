@@ -48,6 +48,15 @@ impl MemorySet {
     pub fn token(&self) -> usize {
         self.page_table.token()
     }
+    /// Check whether there is overlap with already mapped pages
+    pub fn check_mmap_area(&self, start_vpn: VirtPageNum, end_vpn: VirtPageNum) -> bool {
+        for area in &self.areas {
+            if !(end_vpn <= area.vpn_range.get_start() || start_vpn >= area.vpn_range.get_end()) {
+                return true;
+            }
+        }
+        false
+    }
     /// Assume that no conflicts.
     pub fn insert_framed_area(
         &mut self,

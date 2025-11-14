@@ -7,11 +7,11 @@
 use super::__switch;
 use super::{fetch_task, TaskStatus};
 use super::{TaskContext, TaskControlBlock};
+use crate::mm::{MapPermission, VirtAddr};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::sync::Arc;
 use lazy_static::*;
-
 /// Processor management structure
 pub struct Processor {
     ///The task currently executing on the current processor
@@ -107,5 +107,32 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
     drop(processor);
     unsafe {
         __switch(switched_task_cx_ptr, idle_task_cx_ptr);
+    }
+}
+
+/// Check whether the memory area of the current process is available
+pub fn check_mmap_area(start_va: VirtAddr, end_va: VirtAddr) -> bool {
+    match current_task() {
+        Some(task) => {
+            let start_vpn = start_va.floor();
+            let end_vpn = end_va.floor();
+            task.inner_exclusive_access()
+                .memory_set
+                .check_mmap_area(start_vpn, end_vpn)
+        }
+        None => false,
+    }
+}
+
+/// Mapping the memory area of the current process
+pub fn add_mmap_area(start_va: VirtAddr, end_va: VirtAddr, perm: MapPermission) -> isize {
+    match current_task() {
+        Some(task) => {
+            task.inner_exclusive_access()
+                .memory_set
+                .insert_framed_area(start_va, end_va, perm);
+            0
+        }
+        None => -1,
     }
 }
