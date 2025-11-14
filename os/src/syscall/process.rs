@@ -4,10 +4,10 @@ use alloc::sync::Arc;
 
 use crate::{
     fs::{open_file, OpenFlags},
-    mm::{translated_refmut, translated_str},
+    mm::{translated_refmut, translated_str, VirtAddr},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next,
+        suspend_current_and_run_next,TaskControlBlock
     },
 };
 use crate::mm::translated_byte_buffer;
@@ -134,10 +134,7 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// YOUR JOB: Implement mmap.
 pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_mmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
+    trace!("kernel:pid[{}] sys_mmap", current_task().unwrap().pid.0);
     let mut perm = MapPermission::empty();
     // Check start address alignment
     if start % PAGE_SIZE != 0 {
@@ -182,12 +179,30 @@ pub fn sys_mmap(start: usize, len: usize, prot: usize) -> isize {
 }
 
 /// YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!(
-        "kernel:pid[{}] sys_munmap NOT IMPLEMENTED",
-        current_task().unwrap().pid.0
-    );
-    -1
+pub fn sys_munmap(start: usize, len: usize) -> isize {
+    trace!("kernel:pid[{}] sys_munmap", current_task().unwrap().pid.0);
+
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+
+    if len % PAGE_SIZE != 0 {
+        return -1;
+    }
+
+    let start_va = VirtAddr::from(start);
+    // let end_va = VirtAddr::from(start + len);
+    let start_vpn = start_va.floor();
+    // let end_vpn = end_va.ceil();
+
+    match current_task() {
+        Some(task) => {
+            let mut inner = task.inner_exclusive_access();
+            inner.memory_set.remove_area_with_start_vpn(start_vpn);
+            0
+        }
+        None => -1,
+    }
 }
 
 /// change data segment size
@@ -202,12 +217,30 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-pub fn sys_spawn(_path: *const u8) -> isize {
+pub fn sys_spawn(path: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_spawn WIP",
         current_task().unwrap().pid.0
     );
-    -1
+    // Check whether path is valid
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    if let Some(data) = get_app_data_by_name(path.as_str()) {
+        let spawn_task_control_block = Arc::new(TaskControlBlock::new(data));
+        let mut spawn_task_inner = spawn_task_control_block.inner_exclusive_access();
+        spawn_task_inner.parent = Some(Arc::downgrade(&current_task().unwrap()));
+        drop(spawn_task_inner);
+        let current_task = current_task().unwrap();
+        let mut current_task_inner = current_task.inner_exclusive_access();
+        current_task_inner
+            .children
+            .push(spawn_task_control_block.clone());
+        drop(current_task_inner);
+        add_task(spawn_task_control_block.clone());
+        spawn_task_control_block.getpid() as isize
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Set task priority.
