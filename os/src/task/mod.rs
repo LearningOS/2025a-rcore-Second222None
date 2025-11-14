@@ -40,6 +40,13 @@ pub use signal::SignalFlags;
 pub use task::{TaskControlBlock, TaskStatus};
 
 /// Make current task suspended and switch to the next task
+pub use id::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
+pub use manager::add_task;
+pub use processor::{
+    add_mmap_area, check_mmap_area, current_task, current_trap_cx, current_user_token, run_tasks,
+    schedule, take_current_task, Processor,
+};
+/// Suspend the current 'Running' task and run the next task in task list.
 pub fn suspend_current_and_run_next() {
     // There must be an application running.
     let task = take_current_task().unwrap();
