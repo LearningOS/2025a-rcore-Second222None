@@ -2,21 +2,19 @@
 //!
 use alloc::sync::Arc;
 
+use crate::mm::translated_byte_buffer;
+use crate::timer::get_time_us;
+use crate::{
+    config::PAGE_SIZE,
+    mm::MapPermission,
+    task::{add_mmap_area, check_mmap_area},
+};
 use crate::{
     fs::{open_file, OpenFlags},
     mm::{translated_refmut, translated_str, VirtAddr},
     task::{
         add_task, current_task, current_user_token, exit_current_and_run_next,
-        suspend_current_and_run_next,TaskControlBlock
-    },
-};
-use crate::mm::translated_byte_buffer;
-use crate::timer::get_time_us;
-use crate::{
-    config::PAGE_SIZE,
-    mm::{MapPermission},
-    task::{
-        add_mmap_area, check_mmap_area,
+        suspend_current_and_run_next, TaskControlBlock,
     },
 };
 
@@ -225,8 +223,9 @@ pub fn sys_spawn(path: *const u8) -> isize {
     // Check whether path is valid
     let token = current_user_token();
     let path = translated_str(token, path);
-    if let Some(data) = get_app_data_by_name(path.as_str()) {
-        let spawn_task_control_block = Arc::new(TaskControlBlock::new(data));
+    if let Some(inode) = open_file(path.as_str(), OpenFlags::RDONLY) {
+        let data = inode.read_all();
+        let spawn_task_control_block = Arc::new(TaskControlBlock::new(data.as_slice()));
         let mut spawn_task_inner = spawn_task_control_block.inner_exclusive_access();
         spawn_task_inner.parent = Some(Arc::downgrade(&current_task().unwrap()));
         drop(spawn_task_inner);
