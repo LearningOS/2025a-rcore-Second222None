@@ -2,6 +2,7 @@
 use alloc::sync::Arc;
 
 use crate::mm::{translated_byte_buffer, VirtAddr};
+use crate::task::TaskControlBlock;
 use crate::timer::get_time_us;
 use crate::{
     config::PAGE_SIZE,
@@ -215,12 +216,30 @@ pub fn sys_sbrk(size: i32) -> isize {
 
 /// YOUR JOB: Implement spawn.
 /// HINT: fork + exec =/= spawn
-pub fn sys_spawn(_path: *const u8) -> isize {
+pub fn sys_spawn(path: *const u8) -> isize {
     trace!(
-        "kernel:pid[{}] sys_spawn NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_spawn WIP",
         current_task().unwrap().pid.0
     );
-    -1
+    // Check whether path is valid
+    let token = current_user_token();
+    let path = translated_str(token, path);
+    if let Some(data) = get_app_data_by_name(path.as_str()) {
+        let spawn_task_control_block = Arc::new(TaskControlBlock::new(data));
+        let mut spawn_task_inner = spawn_task_control_block.inner_exclusive_access();
+        spawn_task_inner.parent = Some(Arc::downgrade(&current_task().unwrap()));
+        drop(spawn_task_inner);
+        let current_task = current_task().unwrap();
+        let mut current_task_inner = current_task.inner_exclusive_access();
+        current_task_inner
+            .children
+            .push(spawn_task_control_block.clone());
+        drop(current_task_inner);
+        add_task(spawn_task_control_block.clone());
+        spawn_task_control_block.getpid() as isize
+    } else {
+        -1
+    }
 }
 
 // YOUR JOB: Set task priority.

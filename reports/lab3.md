@@ -1,6 +1,27 @@
 # lab3
 
+首先完成sys_get_time(),sys_mmap(),sys_munmap()函数的迁移。与之前相比，进程管理数据结构进行了调整：
+- 任务控制块TaskControlBlock：表示进程的核心数据结构
+- 处理器管理结构Processor：用于进程调度，维护进程的处理器状态。通过Processor结构找到当前进程的MemorySet（current_task()），然后执行相应的mmap、munmap操作。
 
+进程管理设计到很多前面章节涉及到的内容：
+- [TrapContext](https://rcore-os.cn/rCore-Tutorial-Book-v3/chapter2/4trap-handling.html)：Trap发生时需要保存的物理资源内容
+    ```rust
+
+    // os/src/trap/context.rs
+
+    #[repr(C)]
+    pub struct TrapContext {
+        pub x: [usize; 32],
+        pub sstatus: Sstatus,
+        pub sepc: usize,
+    }
+    ```
+- [函数调用上下文](https://rcore-os.cn/rCore-Tutorial-Book-v3/chapter1/5support-func-call.html)：我们将由于函数调用，在控制流转移前后需要保持不变的寄存器集合称之为 函数调用上下文 (Function Call Context) 。由于每个 CPU 只有一套寄存器，我们若想在子函数调用前后保持函数调用上下文不变，就需要物理内存的帮助。这一过程由函数的调用者（caller）和被调用者（callee）合作完成。
+
+spawn的实现仿照INITPROC的代码，但是需要注意：
+- 设置子进程的父进程为调用spawn的进程
+- 设置调用spawn的进程为子进程的父进程
 
 ## 荣誉准则
 
