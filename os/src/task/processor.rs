@@ -21,6 +21,7 @@ pub struct Processor {
 }
 
 impl Processor {
+    /// Initialize a new Processor
     pub fn new() -> Self {
         Self {
             current: None,
@@ -133,11 +134,11 @@ pub fn schedule(switched_task_cx_ptr: *mut TaskContext) {
 pub fn check_mmap_area(start_va: VirtAddr, end_va: VirtAddr) -> bool {
     match current_task() {
         Some(task) => {
+            let process = task.process.upgrade().expect("Process was dropped unexpectedly");
+            let inner = process.inner_exclusive_access();
             let start_vpn = start_va.floor();
             let end_vpn = end_va.floor();
-            task.inner_exclusive_access()
-                .memory_set
-                .check_mmap_area(start_vpn, end_vpn)
+            inner.memory_set.check_mmap_area(start_vpn, end_vpn)
         }
         None => false,
     }
@@ -147,9 +148,9 @@ pub fn check_mmap_area(start_va: VirtAddr, end_va: VirtAddr) -> bool {
 pub fn add_mmap_area(start_va: VirtAddr, end_va: VirtAddr, perm: MapPermission) -> isize {
     match current_task() {
         Some(task) => {
-            task.inner_exclusive_access()
-                .memory_set
-                .insert_framed_area(start_va, end_va, perm);
+            let process = task.process.upgrade().expect("Process was dropped unexpectedly");
+            let mut inner = process.inner_exclusive_access();
+            inner.memory_set.insert_framed_area(start_va, end_va, perm);
             0
         }
         None => -1,
